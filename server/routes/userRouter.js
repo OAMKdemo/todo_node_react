@@ -1,69 +1,66 @@
-import { pool } from '../helper/db.js'
 import { Router } from 'express'
-import { hash,compare } from 'bcrypt'
+import { compare, hash } from 'bcrypt'
 import jwt from 'jsonwebtoken'
+import { pool } from '../helper/db.js'
+import { ApiError } from '../helper/ApiError.js'
 
 const { sign } = jwt
-
 const router = Router()
 
-router.post('/signup', (req, res, next) => {
-  const { user } = req.body
+router.post('/signup', async (req, res, next) => {
+  try {
+    const email = req.body.user?.email?.trim().toLowerCase()
+    const password = req.body.user?.password
 
-  if (!user || !user.email || !user.password) {
-    const error = new Error('Email and password are required')
-    return next(error)
-  }
-
-  hash(user.password, 10, (err, hashedPassword) => {
-    if (err) return next(err)
-
-    pool.query('INSERT INTO account (email, password) VALUES ($1, $2) RETURNING *', 
-      [user.email, hashedPassword], 
-      (err, result) => {
-        if (err) {
-          return next(err)
-        }
-        res.status(201).json({ id: result.rows[0].id, email: user.email })
-      })
-  }) 
-})
-
-router.post('/signin', (req, res, next) => {
-  const { user } = req.body  
-  if (!user || !user.email || !user.password) {
-    const error = new Error('Email and password are required')
-    error.status = 400
-    return next(error)
-  }   
-  pool.query('SELECT * FROM account WHERE email = $1', [user.email], (err, result) => {
-    if (err) return next(err)
-
-    if (result.rows.length === 0) {
-      const error = new Error('User not found')
-      error.status = 404
-      return next(error)
+    if (!email || !password) {
+      return next(new ApiError('Email and password are required', 400))
     }
 
+    const hashedPassword = await hash(password, 10)
+    const result = await pool.query(
+      'INSERT INTO account (email, password) VALUES ($1, $2) RETURNING id, email',
+      [email, hashedPassword],
+    )
+
+    return res.status(201).json(result.rows[0])
+  } catch (error) {
+    if (error.code === '23505') {
+      return next(new ApiError('An account with this email already exists', 409))
+    }
+    return next(error)
+  }
+})
+
+router.post('/signin', async (req, res, next) => {
+  try {
+    const email = req.body.user?.email?.trim().toLowerCase()
+    const password = req.body.user?.password
+
+    if (!email || !password) {
+      return next(new ApiError('Email and password are required', 400))
+    }
+
+    const result = await pool.query('SELECT id, email, password FROM account WHERE email = $1', [email])
     const dbUser = result.rows[0]
 
-    compare(user.password, dbUser.password, (err, isMatch) => {
-      if (err) return next(err) 
-      
-      if (!isMatch) {
-        const error = new Error('Invalid password')
-        error.status = 401
-        return next(error)
-      }
-    })
+    if (!dbUser || !(await compare(password, dbUser.password))) {
+      return next(new ApiError('Invalid email or password', 401))
+    }
 
-    const token = sign({ user: dbUser.email }, process.env.JWT_SECRET_KEY)
-    res.status(200).json({ 
+    const token = sign(
+      { userId: dbUser.id, email: dbUser.email },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: '1h' },
+    )
+
+    return res.status(200).json({
       id: dbUser.id,
       email: dbUser.email,
-      token
-     })
-  })  
+      token,
+    })
+  } catch (error) {
+    return next(error)
+  }
 })
 
 export default router

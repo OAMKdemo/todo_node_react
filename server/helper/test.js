@@ -1,43 +1,26 @@
-import fs from 'fs'
+import fs from 'fs/promises'
 import path from 'path'
-import { pool } from './db.js'
 import { hash } from 'bcrypt'
 import jwt from 'jsonwebtoken'
+import { pool } from './db.js'
 
 const __dirname = import.meta.dirname
 
-const initializeTestDb =  () => {
-  const sql = fs.readFileSync(path.resolve(__dirname, '../db.sql'), 'utf8')
-
-  pool.query(sql, (err) => {
-    if (err) {
-      console.error('Error initializing test database:', err)
-    } else {
-      console.log('Test database initialized successfully')
-    }
-  })
+const initializeTestDb = async () => {
+  const sql = await fs.readFile(path.resolve(__dirname, '../db.sql'), 'utf8')
+  await pool.query(sql)
 }
 
-const insertTestUser = (user) => {
-  hash(user.password, 10, (err, hashedPassword) => {
-    if (err) {
-      console.error('Error hashing password:', err)
-      return      
-    }
-    pool.query('INSERT INTO account (email, password) VALUES ($1, $2)', 
-      [user.email, hashedPassword], 
-      (err, result) => {
-        if (err) {
-          console.error('Error inserting test user:', err)
-        } else {
-          console.log('Test user inserted successfully')
-        }
-      })
-  })
+const insertTestUser = async (user) => {
+  const hashedPassword = await hash(user.password, 10)
+  await pool.query(
+    'INSERT INTO account (email, password) VALUES ($1, $2)',
+    [user.email.toLowerCase(), hashedPassword],
+  )
 }
 
-const getToken = (email) =>{
-  return jwt.sign({ email }, process.env.JWT_SECRET_KEY)
+const getToken = (email) => {
+  return jwt.sign({ email }, process.env.JWT_SECRET_KEY, { expiresIn: '1h' })
 }
 
 export { initializeTestDb, insertTestUser, getToken }

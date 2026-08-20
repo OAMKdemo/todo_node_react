@@ -1,75 +1,73 @@
-import './App.css'
-import { useState,useEffect } from 'react'
-import { useUser } from './context/useUser'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
+import './App.css'
 import Row from './components/Row'
+import { useUser } from './context/useUser'
+
+const apiUrl = import.meta.env.VITE_API_URL
 
 function App() {
   const [task, setTask] = useState('')
-  const [tasks, setTasks] = useState([]) 
+  const [tasks, setTasks] = useState([])
   const { user } = useUser()
 
-  const url = "http://localhost:3001"
-
   useEffect(() => {
-    axios.get(url)
-      .then(response => {
-        setTasks(response.data)
-      })
-      .catch(error => {
-        alert(error.response.data ? error.response.data.message : error)
+    axios.get(`${apiUrl}/tasks`)
+      .then((response) => setTasks(response.data))
+      .catch((error) => {
+        alert(error.response?.data?.error?.message ?? error.message)
       })
   }, [])
 
-  const addTask = () => {
-    const headers = {headers: {Authorization: user.token}}
-    const newTask = { description: task }
+  const addTask = async (event) => {
+    event.preventDefault()
+    const description = task.trim()
 
-    axios.post(url + "/create", { task: newTask },headers)
-      .then(response => {
-        setTasks([...tasks, response.data])
-        setTask('')
-      })
-      .catch(error => {
-        alert(error.response ? error.response.data.error.message : error)
-      })
+    if (!description) return
+
+    try {
+      const response = await axios.post(
+        `${apiUrl}/tasks`,
+        { task: { description } },
+        { headers: { Authorization: `Bearer ${user.token}` } },
+      )
+      setTasks((currentTasks) => [...currentTasks, response.data])
+      setTask('')
+    } catch (error) {
+      alert(error.response?.data?.error?.message ?? error.message)
+    }
   }
 
-  const deleteTask = (deleted) => {
-    const headers = {headers: {Authorization: user.token}}
-    axios.delete(url + "/delete/" + deleted,headers)
-      .then(response => {
-        setTasks(tasks.filter(item => item.id !== deleted))
+  const deleteTask = async (id) => {
+    try {
+      await axios.delete(`${apiUrl}/tasks/${id}`, {
+        headers: { Authorization: `Bearer ${user.token}` },
       })
-      .catch(error => {
-        alert(error.response ? error.response.data.error.message : error)
-      })
+      setTasks((currentTasks) => currentTasks.filter((item) => item.id !== id))
+    } catch (error) {
+      alert(error.response?.data?.error?.message ?? error.message)
+    }
   }
 
   return (
-    <div id="container">
-      <h3>Todos</h3>
-      <form>
+    <main id="container">
+      <h1>Todos</h1>
+      <form onSubmit={addTask}>
+        <label htmlFor="task">New task</label>
         <input
-          placeholder='Add new task'
+          id="task"
+          placeholder="Add new task"
           value={task}
-          onChange={e => setTask(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              addTask()
-            }
-          }}
+          onChange={(event) => setTask(event.target.value)}
         />
+        <button type="submit">Add</button>
       </form>
-       <ul>
-       {
-          tasks.map(item => (
-           <Row item={item} key={item.id} deleteTask={deleteTask} />
-          ))
-        }
+      <ul>
+        {tasks.map((item) => (
+          <Row task={item} key={item.id} onDelete={deleteTask} />
+        ))}
       </ul>
-    </div>
+    </main>
   )
 }
 

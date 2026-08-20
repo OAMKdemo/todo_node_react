@@ -1,11 +1,18 @@
 import { pool } from '../helper/db.js'
 
-const selectAllTasks = async () => {
-  return await pool.query('SELECT * FROM task')
+const selectAllTasks = () => {
+  return pool.query('SELECT id, description FROM task ORDER BY id')
 }
 
-const insertTask = async (description) => {
-  return await pool.query('insert into task (description) values ($1) returning *', [description])    
+const insertTask = (description) => {
+  return pool.query(
+    'INSERT INTO task (description) VALUES ($1) RETURNING id, description',
+    [description],
+  )
 }
 
-export { selectAllTasks,insertTask }
+const deleteTaskById = (id) => {
+  return pool.query('DELETE FROM task WHERE id = $1', [id])
+}
+
+export { selectAllTasks, insertTask, deleteTaskById }

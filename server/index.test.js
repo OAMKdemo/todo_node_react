@@ -1,96 +1,117 @@
-import { expect } from "chai"
-import { getToken, initializeTestDb,insertTestUser } from "./helper/test.js"
+import { expect } from 'chai'
+import { getToken, initializeTestDb, insertTestUser } from './helper/test.js'
 
-describe("Testing basic database functionality", () => {
-  let token = null
-  const testUser = { email: "foo@foo.com", password: "password123" }
-  before(() => {
-    initializeTestDb()
-    token = getToken(testUser)
-  })
+const apiUrl = 'http://localhost:3001'
 
-  it("should get all tasks", async () => {
-    const response = await fetch("http://localhost:3001/")
+before(async () => {
+  await initializeTestDb()
+})
+
+describe('Task API', () => {
+  const token = getToken('task-test@example.com')
+
+  it('gets all tasks', async () => {
+    const response = await fetch(`${apiUrl}/tasks`)
     const data = await response.json()
+
     expect(response.status).to.equal(200)
-    expect(data).to.be.an("array").that.is.not.empty
-    expect(data[0]).to.include.all.keys(["id", "description"])
+    expect(data).to.be.an('array').that.is.not.empty
+    expect(data[0]).to.include.all.keys(['id', 'description'])
   })
 
-  it("should create a new task", async () => {
-    const newTask = { description: "Test task" }
-    const response = await fetch("http://localhost:3001/create", {
-      method: "post",
-      headers: { 
-        "Content-Type": "application/json",
-        Authorization: token
+  it('creates a task', async () => {
+    const newTask = { description: 'Test task' }
+    const response = await fetch(`${apiUrl}/tasks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ task: newTask })
+      body: JSON.stringify({ task: newTask }),
     })
     const data = await response.json()
+
     expect(response.status).to.equal(201)
-    expect(data).to.include.all.keys(["id", "description"])
+    expect(data).to.include.all.keys(['id', 'description'])
     expect(data.description).to.equal(newTask.description)
   })
 
-  it("should delete task", async () => {
-    const response = await fetch("http://localhost:3001/delete/1", {
-      method: "delete",
-      headers: { 
-        Authorization: token
-       },
+  it('deletes a task', async () => {
+    const response = await fetch(`${apiUrl}/tasks/1`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
     })
     const data = await response.json()
+
     expect(response.status).to.equal(200)
-    expect(data).to.include.all.keys("id")
+    expect(data).to.have.property('id', 1)
   })
 
-  
-  it("should not create a new task without description", async () => {
-    const response = await fetch("http://localhost:3001/create", {
-      method: "post",
-      headers: { 
-        "Content-Type": "application/json",
-        Authorization: token
+  it('rejects a task without a description', async () => {
+    const response = await fetch(`${apiUrl}/tasks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ task: null})
+      body: JSON.stringify({ task: { description: '   ' } }),
     })
-    const data = await response.json()
+
     expect(response.status).to.equal(400)
-    expect(data).to.include.all.keys("error")
+  })
+
+  it('rejects creating a task without a token', async () => {
+    const response = await fetch(`${apiUrl}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: { description: 'Unauthorized task' } }),
+    })
+
+    expect(response.status).to.equal(401)
   })
 })
 
-describe("Testing user management", () => {
-  const user = { email: "foo2@test.com", password: "password123" }
-  before(() => {
-      insertTestUser(user)
+describe('User API', () => {
+  const user = { email: 'existing@example.com', password: 'password123' }
+
+  before(async () => {
+    await insertTestUser(user)
   })
 
-  it("should sign up", async () => {
-    const newUser = { email: "foo@test.com" ,password: "password123" }
-
-    const response = await fetch("http://localhost:3001/user/signup", {
-      method: "post",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user: newUser })
+  it('signs up a new user', async () => {
+    const newUser = { email: 'new@example.com', password: 'password123' }
+    const response = await fetch(`${apiUrl}/users/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: newUser }),
     })
     const data = await response.json()
+
     expect(response.status).to.equal(201)
-    expect(data).to.include.all.keys(["id", "email"])
+    expect(data).to.include.all.keys(['id', 'email'])
     expect(data.email).to.equal(newUser.email)
   })
 
-  it ('should log in', async () => {
-    const response = await fetch("http://localhost:3001/user/signin", {
-      method: "post",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user })  
+  it('signs in with valid credentials', async () => {
+    const response = await fetch(`${apiUrl}/users/signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user }),
     })
     const data = await response.json()
+
     expect(response.status).to.equal(200)
-    expect(data).to.include.all.keys(["id", "email", "token"])
+    expect(data).to.include.all.keys(['id', 'email', 'token'])
     expect(data.email).to.equal(user.email)
   })
-})
 
+  it('rejects an incorrect password', async () => {
+    const response = await fetch(`${apiUrl}/users/signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: { ...user, password: 'wrong-password' } }),
+    })
+
+    expect(response.status).to.equal(401)
+  })
+})

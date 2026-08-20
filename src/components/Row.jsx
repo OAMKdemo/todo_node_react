@@ -1,8 +1,10 @@
-export default function Row({item,deleteTask}) {
+export default function Row({ task, onDelete }) {
   return (
     <li>
-      {item.description}
-      <button className='delete-button' onClick={() => deleteTask(item.id)}>Delete</button>
+      {task.description}
+      <button className="delete-button" type="button" onClick={() => onDelete(task.id)}>
+        Delete
+      </button>
     </li>
   )
 }

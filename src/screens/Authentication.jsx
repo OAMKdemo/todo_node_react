@@ -1,51 +1,67 @@
-import { Link } from "react-router-dom"
-import { useUser } from "../context/useUser"
-import { useNavigate } from "react-router-dom"
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useUser } from '../context/useUser'
 
 export const AuthenticationMode = Object.freeze({
-  SignIn: 'Login',
-  SignUp: 'SignUp'
+  SignIn: 'signin',
+  SignUp: 'signup',
 })
 
-export default function Authentication({authenticationMode}) {
-  const { user, setUser,signUp, signIn } = useUser()
+export default function Authentication({ authenticationMode }) {
+  const [credentials, setCredentials] = useState({ email: '', password: '' })
+  const { signUp, signIn } = useUser()
   const navigate = useNavigate()
+  const isSignIn = authenticationMode === AuthenticationMode.SignIn
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event) => {
+    event.preventDefault()
 
-    const signFunction = authenticationMode === AuthenticationMode.SignUp ? 
-      signUp : signIn
-   
-    signFunction().then(response =>{
-      navigate(authenticationMode === Authentication.SignUp ? '/signin' : '/')
-    })
-    .catch(error => {
-      alert(error)
-    })
+    try {
+      if (isSignIn) {
+        await signIn(credentials)
+        navigate('/')
+      } else {
+        await signUp(credentials)
+        navigate('/signin')
+      }
+    } catch (error) {
+      alert(error.response?.data?.error?.message ?? error.message)
+    }
+  }
+
+  const updateCredential = (event) => {
+    setCredentials({ ...credentials, [event.target.name]: event.target.value })
   }
 
   return (
-    <div>
-      <h3>{authenticationMode === AuthenticationMode.SignIn ? 'Sign in' : 'Sign up'}</h3>
+    <main>
+      <h1>{isSignIn ? 'Sign in' : 'Sign up'}</h1>
       <form onSubmit={handleSubmit}>
-        <label>Email</label>
-        <input 
-          placeholder='Email' 
-          value={user.email} 
-          onChange={e => setUser({...user,email: e.target.value})
-        }/>
-        <label>Password</label>
-        <input 
-          placeholder='Password' 
-          type='password' value={user.password} 
-          onChange={e => setUser({...user,password: e.target.value})}
+        <label htmlFor="email">Email</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          value={credentials.email}
+          onChange={updateCredential}
+          required
         />
-        <button type='submit'>{authenticationMode === AuthenticationMode.SignIn ? 'Login' : 'Submit'}</button>
-        <Link to={authenticationMode === AuthenticationMode.SignIn ? '/signup' : '/signin'}>
-          {authenticationMode === AuthenticationMode.SignIn ? 'No account? Sign up' : 'Already signed up? Sign in'}
+        <label htmlFor="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete={isSignIn ? 'current-password' : 'new-password'}
+          value={credentials.password}
+          onChange={updateCredential}
+          required
+        />
+        <button type="submit">{isSignIn ? 'Sign in' : 'Sign up'}</button>
+        <Link to={isSignIn ? '/signup' : '/signin'}>
+          {isSignIn ? 'No account? Sign up' : 'Already have an account? Sign in'}
         </Link>
       </form>
-    </div>
+    </main>
   )
 }
