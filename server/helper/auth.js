@@ -3,7 +3,7 @@ import { ApiError } from './ApiError.js'
 
 const { verify } = jwt
 
-const auth = (req, res, next) => {
+const auth = (req, _res, next) => {
   const authorization = req.get('authorization')
   const [scheme, token] = authorization?.split(' ') || []
 
