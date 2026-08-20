@@ -1,7 +1,7 @@
 import { ApiError } from '../helper/ApiError.js'
 import { deleteTaskById, insertTask, selectAllTasks } from '../models/Task.js'
 
-const getTasks = async (req, res, next) => {
+const getTasks = async (_req, res, next) => {
   try {
     const result = await selectAllTasks()
     return res.status(200).json(result.rows)
