@@ -13,7 +13,7 @@ app.use(express.json())
 app.use('/tasks', todoRouter)
 app.use('/users', userRouter)
 
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   const status = err.status || 500
 
   if (status === 500) {
